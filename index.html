@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>SpendTrack</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#FFC94A">
+<meta name="theme-color" content="#17150F">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -18,210 +18,238 @@
 <body>
   <div class="app">
 
-    <header class="topbar">
-      <div class="brand">
-        <span class="brand-mark">💸</span>
-        <span class="brand-name">SpendTrack</span>
-      </div>
-      <div class="topbar-actions">
-        <button id="themeToggle" class="icon-btn" title="Toggle theme" aria-label="Toggle theme">🌙</button>
-        <button id="settingsBtn" class="icon-btn" title="Settings" aria-label="Settings">⚙️</button>
-      </div>
-    </header>
-
-    <nav class="tabs">
-      <button class="tab-btn active" data-tab="dashboard">
-        <span class="tab-icon tab-icon-a">📊</span>
-        <span>Dashboard</span>
-      </button>
-      <button class="tab-btn" data-tab="transactions">
-        <span class="tab-icon tab-icon-b">📒</span>
-        <span>Transactions</span>
-      </button>
-      <button class="tab-btn" data-tab="budgets">
-        <span class="tab-icon tab-icon-c">🎯</span>
-        <span>Budgets</span>
-      </button>
-      <button class="tab-btn" data-tab="charts">
-        <span class="tab-icon tab-icon-d">🥧</span>
-        <span>Charts</span>
-      </button>
-    </nav>
-
     <main>
-      <!-- DASHBOARD -->
+      <!-- HOME -->
       <section id="panel-dashboard" class="panel active">
-        <div class="stat-grid">
-          <div class="stat-card stat-balance">
-            <span class="stat-label">Balance</span>
-            <span class="stat-value" id="statBalance">RM 0.00</span>
+        <header class="screen-head">
+          <div class="greeting">
+            <span class="eyebrow" id="heroMonth">This month</span>
+            <h1>SpendTrack</h1>
           </div>
-          <div class="stat-card stat-income">
-            <span class="stat-label">Income <small>this month</small></span>
-            <span class="stat-value" id="statIncome">▲ RM 0.00</span>
+          <div class="head-actions">
+            <button id="themeToggle" class="icon-btn" title="Toggle theme" aria-label="Toggle theme">🌙</button>
+            <button id="settingsBtn" class="icon-btn" title="Settings" aria-label="Settings">⚙️</button>
           </div>
-          <div class="stat-card stat-expense">
-            <span class="stat-label">Expenses <small>this month</small></span>
-            <span class="stat-value" id="statExpense">▼ RM 0.00</span>
+        </header>
+
+        <div class="hero-card">
+          <div class="hero-top">
+            <span class="hero-label" id="heroLabel">Left to spend this month</span>
+            <span class="hero-value" id="heroValue">RM 0.00</span>
           </div>
-          <div class="stat-card stat-savings">
-            <span class="stat-label">Savings <small>this month</small></span>
-            <span class="stat-value" id="statSavings">RM 0.00</span>
+          <div class="hero-bar-wrap" id="heroBarWrap">
+            <div class="hero-bar-track"><div class="hero-bar-fill" id="heroBarFill"></div></div>
+            <div class="hero-bar-sub">
+              <span id="heroSpent">RM 0.00 spent</span>
+              <span id="heroLimit">of RM 0.00 budget</span>
+            </div>
+          </div>
+          <p class="hero-hint" id="heroHint">Set limits in Budgets to see what's left each month.</p>
+          <div class="hero-split">
+            <div>
+              <span class="split-label">Income</span>
+              <span class="split-value income" id="statIncome">RM 0.00</span>
+            </div>
+            <div class="split-divider"></div>
+            <div>
+              <span class="split-label">Expenses</span>
+              <span class="split-value expense" id="statExpense">RM 0.00</span>
+            </div>
           </div>
         </div>
 
         <div class="section-head">
-          <h2>Recent Activity</h2>
+          <h2>Recent</h2>
           <button class="link-btn" data-goto="transactions">View all</button>
         </div>
-        <ul id="recentList" class="txn-list"></ul>
-        <p id="recentEmpty" class="empty-state">No transactions yet. Tap the + button to add your first one.</p>
+        <div id="recentGroups" class="txn-groups"></div>
+        <p id="recentEmpty" class="empty-state">No transactions yet. Tap + to add your first one.</p>
       </section>
 
-      <!-- TRANSACTIONS -->
+      <!-- ACTIVITY -->
       <section id="panel-transactions" class="panel">
-        <div class="search-row">
-          <input type="text" id="searchInput" class="search-input" placeholder="🔍 Search notes or categories...">
-        </div>
+        <header class="screen-head">
+          <h1>Activity</h1>
+        </header>
+        <input type="text" id="searchInput" class="search-input" placeholder="🔍  Search notes or categories">
         <div class="filter-row">
           <div class="chip-group" id="typeFilter">
             <button class="chip active" data-type="all">All</button>
             <button class="chip" data-type="income">Income</button>
             <button class="chip" data-type="expense">Expense</button>
           </div>
-          <select id="categoryFilter" class="filter-select">
+          <select id="categoryFilter" class="chip chip-select">
             <option value="all">All categories</option>
           </select>
         </div>
-        <ul id="txnFullList" class="txn-list"></ul>
+        <div id="txnGroups" class="txn-groups"></div>
         <p id="txnEmpty" class="empty-state">No matching transactions.</p>
       </section>
 
       <!-- BUDGETS -->
       <section id="panel-budgets" class="panel">
-        <div class="section-head">
-          <h2>Monthly Budgets</h2>
-          <span class="muted-note">Set a limit per category to track overspending</span>
+        <header class="screen-head">
+          <div class="greeting">
+            <h1>Budgets</h1>
+            <span class="eyebrow" id="budgetSubhead">This month</span>
+          </div>
+        </header>
+        <div class="overall-card">
+          <div>
+            <span class="overall-label">Overall</span>
+            <span class="overall-value" id="overallPct">0% used</span>
+          </div>
+          <div class="overall-right" id="overallAmounts">No limits set</div>
         </div>
         <div id="budgetList" class="budget-list"></div>
       </section>
 
       <!-- CHARTS -->
       <section id="panel-charts" class="panel">
-        <div class="card chart-card">
-          <h2>Spending by Category <small>this month</small></h2>
+        <header class="screen-head">
+          <div class="greeting">
+            <h1>Charts</h1>
+            <span class="eyebrow" id="chartsMonth"></span>
+          </div>
+        </header>
+
+        <div class="card">
+          <h2 class="card-title">Where it went</h2>
           <div class="donut-wrap">
-            <svg id="donutChart" viewBox="0 0 200 200" class="donut-svg"></svg>
+            <div class="donut-holder">
+              <svg id="donutChart" viewBox="0 0 200 200" class="donut-svg"></svg>
+              <div class="donut-center">
+                <span class="donut-center-label">Total</span>
+                <span class="donut-center-value" id="donutTotal">0</span>
+              </div>
+            </div>
             <div id="donutLegend" class="donut-legend"></div>
           </div>
           <p id="donutEmpty" class="empty-state">No expenses recorded this month.</p>
         </div>
-        <div class="card chart-card">
-          <h2>Income vs Expenses <small>last 6 months</small></h2>
-          <svg id="barChart" viewBox="0 0 320 200" class="bar-svg"></svg>
-        </div>
-      </section>
-    </main>
 
-    <button id="fabAdd" class="fab" title="Add transaction" aria-label="Add transaction">+</button>
-  </div>
-
-  <!-- TRANSACTION MODAL -->
-  <div id="txnModal" class="modal-overlay">
-    <div class="modal">
-      <div class="modal-head">
-        <h2 id="modalTitle">Add Transaction</h2>
-        <button class="icon-btn" id="closeModal" aria-label="Close">✕</button>
-      </div>
-      <form id="txnForm">
-        <input type="hidden" id="txnId">
-        <div class="type-toggle">
-          <button type="button" class="type-btn income active" data-type="income">Income</button>
-          <button type="button" class="type-btn expense" data-type="expense">Expense</button>
-        </div>
-
-        <label class="field-label">Amount</label>
-        <input type="number" id="amount" class="field-input" placeholder="0.00" step="0.01" min="0.01" required>
-
-        <label class="field-label">Category</label>
-        <select id="category" class="field-input" required></select>
-
-        <div id="newCategoryPanel" class="new-category-panel" style="display:none;">
-          <label class="field-label">New category name</label>
-          <input type="text" id="newCatName" class="field-input" placeholder="e.g. Pets">
-          <label class="field-label">Icon <small>(emoji, optional)</small></label>
-          <input type="text" id="newCatIcon" class="field-input" placeholder="🐾" maxlength="4">
-          <label class="field-label">Color</label>
-          <div id="paletteSwatches" class="palette-swatches"></div>
-          <div class="new-category-actions">
-            <button type="button" id="cancelNewCat" class="btn btn-secondary">Cancel</button>
-            <button type="button" id="confirmNewCat" class="btn btn-primary">Add Category</button>
+        <div class="card">
+          <div class="card-title-row">
+            <h2 class="card-title">Income vs expenses</h2>
+            <span class="muted-note">last 6 months</span>
+          </div>
+          <svg id="barChart" viewBox="0 0 320 190" class="bar-svg"></svg>
+          <div class="chart-legend">
+            <span><i class="sq income"></i>Income</span>
+            <span><i class="sq expense"></i>Expenses</span>
           </div>
         </div>
 
-        <label class="field-label">Date</label>
-        <input type="date" id="date" class="field-input" required>
+        <div class="takeaway" id="takeaway"></div>
+      </section>
+    </main>
 
-        <label class="field-label">Payment Method</label>
-        <select id="paymentMethod" class="field-input">
-          <option>Cash</option>
-          <option>Card</option>
-          <option>Bank Transfer</option>
-          <option>Other</option>
-        </select>
+    <nav class="tabbar">
+      <button class="tab-btn active" data-tab="dashboard"><span class="tab-icon">📊</span><span>Home</span></button>
+      <button class="tab-btn" data-tab="transactions"><span class="tab-icon">📒</span><span>Activity</span></button>
+      <button id="fabAdd" class="fab" aria-label="Add transaction">+</button>
+      <button class="tab-btn" data-tab="budgets"><span class="tab-icon">🎯</span><span>Budgets</span></button>
+      <button class="tab-btn" data-tab="charts"><span class="tab-icon">🥧</span><span>Charts</span></button>
+    </nav>
+  </div>
 
-        <label class="field-label">Note <small>(optional)</small></label>
-        <input type="text" id="note" class="field-input" placeholder="e.g. Lunch with friends">
+  <!-- TRANSACTION SHEET -->
+  <div id="txnModal" class="modal-overlay">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2 id="modalTitle">New expense</h2>
+        <button class="icon-btn" id="closeModal" aria-label="Close">✕</button>
+      </div>
 
-        <div class="modal-actions">
-          <button type="button" id="deleteTxnBtn" class="btn btn-danger" style="display:none;">Delete</button>
-          <button type="submit" class="btn btn-primary">Save Transaction</button>
+      <div class="type-toggle">
+        <button type="button" class="type-btn expense active" data-type="expense">Expense</button>
+        <button type="button" class="type-btn income" data-type="income">Income</button>
+      </div>
+
+      <div class="amount-display">
+        <span class="amount-currency">RM</span>
+        <span class="amount-value" id="amountDisplay">0</span>
+      </div>
+
+      <div class="cat-row" id="catRow"></div>
+
+      <div id="newCategoryPanel" class="new-category-panel" style="display:none;">
+        <label class="field-label">New category name</label>
+        <input type="text" id="newCatName" class="field-input" placeholder="e.g. Pets">
+        <label class="field-label">Icon <small>(emoji, optional)</small></label>
+        <input type="text" id="newCatIcon" class="field-input" placeholder="🐾" maxlength="4">
+        <label class="field-label">Colour</label>
+        <div id="paletteSwatches" class="palette-swatches"></div>
+        <div class="new-category-actions">
+          <button type="button" id="cancelNewCat" class="btn btn-secondary">Cancel</button>
+          <button type="button" id="confirmNewCat" class="btn btn-primary">Add category</button>
         </div>
-      </form>
+      </div>
+
+      <div class="meta-row">
+        <label class="pill pill-input">
+          <input type="date" id="date">
+        </label>
+        <label class="pill pill-input">
+          <select id="paymentMethod">
+            <option>Cash</option>
+            <option>Card</option>
+            <option>Bank Transfer</option>
+            <option>Other</option>
+          </select>
+        </label>
+      </div>
+      <input type="text" id="note" class="field-input" placeholder="Add a note">
+
+      <div class="keypad" id="keypad">
+        <button type="button" data-key="1">1</button>
+        <button type="button" data-key="2">2</button>
+        <button type="button" data-key="3">3</button>
+        <button type="button" data-key="4">4</button>
+        <button type="button" data-key="5">5</button>
+        <button type="button" data-key="6">6</button>
+        <button type="button" data-key="7">7</button>
+        <button type="button" data-key="8">8</button>
+        <button type="button" data-key="9">9</button>
+        <button type="button" data-key=".">.</button>
+        <button type="button" data-key="0">0</button>
+        <button type="button" data-key="del" class="key-soft">⌫</button>
+      </div>
+
+      <div class="sheet-actions">
+        <button type="button" id="deleteTxnBtn" class="btn btn-danger" style="display:none;">Delete</button>
+        <button type="button" id="saveTxnBtn" class="btn btn-primary">Save expense</button>
+      </div>
+      <input type="hidden" id="txnId">
     </div>
   </div>
 
-  <!-- SETTINGS MODAL -->
+  <!-- SETTINGS SHEET -->
   <div id="settingsModal" class="modal-overlay">
-    <div class="modal">
-      <div class="modal-head">
+    <div class="sheet">
+      <div class="sheet-head">
         <h2>Settings</h2>
         <button class="icon-btn" id="closeSettings" aria-label="Close">✕</button>
       </div>
       <div class="settings-body">
         <div class="settings-row">
-          <div>
-            <strong>Appearance</strong>
-            <p class="muted-note">Switch between light and dark mode</p>
-          </div>
-          <button id="themeToggle2" class="btn btn-secondary">Toggle Theme</button>
+          <div><strong>Appearance</strong><p class="muted-note">Switch between light and dark mode</p></div>
+          <button id="themeToggle2" class="btn btn-secondary">Toggle</button>
         </div>
         <div class="settings-row">
-          <div>
-            <strong>Your data</strong>
-            <p class="muted-note">Stored only on this device, in this browser</p>
-          </div>
+          <div><strong>Your data</strong><p class="muted-note">Stored only on this device, in this browser</p></div>
         </div>
         <div class="settings-row">
-          <div>
-            <strong>Export backup</strong>
-            <p class="muted-note">Save your transactions & budgets as a file</p>
-          </div>
+          <div><strong>Export backup</strong><p class="muted-note">Save your transactions &amp; budgets as a file</p></div>
           <button id="exportBtn" class="btn btn-secondary">Export</button>
         </div>
         <div class="settings-row">
-          <div>
-            <strong>Import backup</strong>
-            <p class="muted-note">Restore from a previously exported file</p>
-          </div>
+          <div><strong>Import backup</strong><p class="muted-note">Restore from a previously exported file</p></div>
           <button id="importBtn" class="btn btn-secondary">Import</button>
           <input type="file" id="importFile" accept="application/json" style="display:none;">
         </div>
         <div class="settings-row sync-row">
-          <div>
-            <strong>Cloud Sync</strong>
-            <p class="muted-note">Create an account to back up and sync across devices</p>
-          </div>
+          <div><strong>Cloud sync</strong><p class="muted-note">Back up and sync across devices</p></div>
           <button class="btn btn-secondary" disabled title="Coming soon">Coming soon</button>
         </div>
       </div>

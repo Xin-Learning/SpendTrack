@@ -31,16 +31,70 @@ const CATEGORIES = {
   ]
 };
 
-function allCategories(type) {
-  return [...(CATEGORIES[type] || []), ...(customCategories[type] || [])];
+/* ---------- STATE ---------- */
+function load(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch { return fallback; }
 }
 
-function findCategory(type, name) {
-  return allCategories(type).find(c => c.name === name);
+let transactions = load(STORAGE_TXN, []);
+let budgets = load(STORAGE_BUDGETS, {});
+let customCategories = load(STORAGE_CUSTOM_CATEGORIES, { expense: [], income: [] });
+
+let modalType = "expense";
+let selectedCategory = null;
+let amountStr = "";
+let selectedPaletteIndex = 0;
+
+function saveTransactions() { localStorage.setItem(STORAGE_TXN, JSON.stringify(transactions)); }
+function saveBudgets() { localStorage.setItem(STORAGE_BUDGETS, JSON.stringify(budgets)); }
+function saveCustomCategories() { localStorage.setItem(STORAGE_CUSTOM_CATEGORIES, JSON.stringify(customCategories)); }
+
+/* ---------- HELPERS ---------- */
+const $ = id => document.getElementById(id);
+
+function allCategories(type) { return [...(CATEGORIES[type] || []), ...(customCategories[type] || [])]; }
+function findCategory(type, name) { return allCategories(type).find(c => c.name === name); }
+function catVar(type, name) { const c = findCategory(type, name); return c ? c.var : "other"; }
+function catBg(type, name) { return `var(--cat-${catVar(type, name)}-bg)`; }
+function catText(type, name) { return `var(--cat-${catVar(type, name)}-text)`; }
+function catIcon(type, name) { const c = findCategory(type, name); return c ? c.icon : "📦"; }
+
+function cssVal(varExpr) {
+  const name = varExpr.replace(/^var\(|\)$/g, "");
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#888";
+}
+
+function fmtMoney(n) {
+  return (n < 0 ? "-" : "") + "RM " + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtPlain(n) {
+  return Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function pad2(n) { return String(n).padStart(2, "0"); }
+function toLocalDateStr(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+function today() { return toLocalDateStr(new Date()); }
+function monthKey(s) { return s.slice(0, 7); }
+function currentMonthKey() { return today().slice(0, 7); }
+
+function dayLabel(dateStr) {
+  const t = new Date();
+  const y = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 1);
+  if (dateStr === today()) return "Today";
+  if (dateStr === toLocalDateStr(y)) return "Yesterday";
+  return new Date(dateStr + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 function rebuildCustomCategoryStyles() {
-  let styleEl = document.getElementById("customCatStyle");
+  let styleEl = $("customCatStyle");
   if (!styleEl) {
     styleEl = document.createElement("style");
     styleEl.id = "customCatStyle";
@@ -57,104 +111,43 @@ function rebuildCustomCategoryStyles() {
   styleEl.textContent = css;
 }
 
-function catBg(type, name) {
-  const c = findCategory(type, name);
-  return c ? `var(--cat-${c.var}-bg)` : "var(--cat-other-bg)";
-}
-
-function catText(type, name) {
-  const c = findCategory(type, name);
-  return c ? `var(--cat-${c.var}-text)` : "var(--cat-other-text)";
-}
-
-function catIcon(type, name) {
-  const c = findCategory(type, name);
-  return c ? c.icon : "📦";
-}
-
-let transactions = load(STORAGE_TXN, []);
-let budgets = load(STORAGE_BUDGETS, {});
-let customCategories = load(STORAGE_CUSTOM_CATEGORIES, { expense: [], income: [] });
-
-function load(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveTransactions() { localStorage.setItem(STORAGE_TXN, JSON.stringify(transactions)); }
-function saveBudgets() { localStorage.setItem(STORAGE_BUDGETS, JSON.stringify(budgets)); }
-function saveCustomCategories() { localStorage.setItem(STORAGE_CUSTOM_CATEGORIES, JSON.stringify(customCategories)); }
-
-function fmtMoney(n) {
-  const sign = n < 0 ? "-" : "";
-  return sign + "RM " + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function fmtDate(dateStr) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-
-function pad2(n) { return String(n).padStart(2, "0"); }
-function toLocalDateStr(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
-function today() { return toLocalDateStr(new Date()); }
-function monthKey(dateStr) { return dateStr.slice(0, 7); }
-function currentMonthKey() { return today().slice(0, 7); }
-
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
-}
-
 /* ---------- THEME ---------- */
-function initTheme() {
-  const stored = localStorage.getItem(STORAGE_THEME);
-  const theme = stored || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-  applyTheme(theme);
-}
-
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
   localStorage.setItem(STORAGE_THEME, theme);
-  const icon = theme === "dark" ? "☀️" : "🌙";
-  document.getElementById("themeToggle").textContent = icon;
+  $("themeToggle").textContent = theme === "dark" ? "☀️" : "🌙";
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", cssVal("var(--bg)"));
 }
-
 function toggleTheme() {
   const current = document.documentElement.getAttribute("data-theme") || "light";
   applyTheme(current === "dark" ? "light" : "dark");
+  if ($("panel-charts").classList.contains("active")) renderCharts();
 }
-
-document.getElementById("themeToggle").addEventListener("click", toggleTheme);
-document.getElementById("themeToggle2").addEventListener("click", toggleTheme);
+function initTheme() {
+  const stored = localStorage.getItem(STORAGE_THEME);
+  applyTheme(stored || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+}
+$("themeToggle").addEventListener("click", toggleTheme);
+$("themeToggle2").addEventListener("click", toggleTheme);
 
 /* ---------- TABS ---------- */
-document.querySelectorAll(".tab-btn").forEach(btn => {
-  btn.addEventListener("click", () => switchTab(btn.dataset.tab));
-});
-
-document.querySelectorAll("[data-goto]").forEach(btn => {
-  btn.addEventListener("click", () => switchTab(btn.dataset.goto));
-});
-
 function switchTab(tab) {
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
   document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "panel-" + tab));
+  window.scrollTo(0, 0);
   if (tab === "charts") renderCharts();
 }
+document.querySelectorAll(".tab-btn").forEach(b => b.addEventListener("click", () => switchTab(b.dataset.tab)));
+document.querySelectorAll("[data-goto]").forEach(b => b.addEventListener("click", () => switchTab(b.dataset.goto)));
 
-/* ---------- SETTINGS MODAL ---------- */
-const settingsModal = document.getElementById("settingsModal");
-document.getElementById("settingsBtn").addEventListener("click", () => settingsModal.classList.add("open"));
-document.getElementById("closeSettings").addEventListener("click", () => settingsModal.classList.remove("open"));
+/* ---------- SETTINGS ---------- */
+const settingsModal = $("settingsModal");
+$("settingsBtn").addEventListener("click", () => settingsModal.classList.add("open"));
+$("closeSettings").addEventListener("click", () => settingsModal.classList.remove("open"));
 settingsModal.addEventListener("click", e => { if (e.target === settingsModal) settingsModal.classList.remove("open"); });
 
-document.getElementById("exportBtn").addEventListener("click", () => {
+$("exportBtn").addEventListener("click", () => {
   const payload = { transactions, budgets, customCategories, exportedAt: new Date().toISOString() };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -165,40 +158,29 @@ document.getElementById("exportBtn").addEventListener("click", () => {
   URL.revokeObjectURL(url);
 });
 
-document.getElementById("importBtn").addEventListener("click", () => {
-  document.getElementById("importFile").click();
-});
+$("importBtn").addEventListener("click", () => $("importFile").click());
 
-document.getElementById("importFile").addEventListener("change", e => {
+$("importFile").addEventListener("change", e => {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
     let data;
-    try {
-      data = JSON.parse(reader.result);
-    } catch {
-      alert("That file isn't valid JSON.");
-      e.target.value = "";
-      return;
-    }
+    try { data = JSON.parse(reader.result); }
+    catch { alert("That file isn't valid JSON."); e.target.value = ""; return; }
     if (!Array.isArray(data.transactions) || typeof data.budgets !== "object") {
       alert("That file doesn't look like a SpendTrack backup.");
-      e.target.value = "";
-      return;
+      e.target.value = ""; return;
     }
     if (!confirm("This will replace your current transactions and budgets with the imported backup. Continue?")) {
-      e.target.value = "";
-      return;
+      e.target.value = ""; return;
     }
     transactions = data.transactions;
     budgets = data.budgets;
     customCategories = data.customCategories && typeof data.customCategories === "object"
       ? { expense: data.customCategories.expense || [], income: data.customCategories.income || [] }
       : { expense: [], income: [] };
-    saveTransactions();
-    saveBudgets();
-    saveCustomCategories();
+    saveTransactions(); saveBudgets(); saveCustomCategories();
     rebuildCustomCategoryStyles();
     renderAll();
     settingsModal.classList.remove("open");
@@ -207,43 +189,53 @@ document.getElementById("importFile").addEventListener("change", e => {
   reader.readAsText(file);
 });
 
-/* ---------- TRANSACTION MODAL ---------- */
-const txnModal = document.getElementById("txnModal");
-const txnForm = document.getElementById("txnForm");
-const modalTitle = document.getElementById("modalTitle");
-const deleteTxnBtn = document.getElementById("deleteTxnBtn");
-let modalType = "income";
-
-const typeButtons = document.querySelectorAll("#txnModal .type-btn");
-typeButtons.forEach(btn => {
-  btn.addEventListener("click", () => setModalType(btn.dataset.type));
-});
+/* ---------- TRANSACTION SHEET ---------- */
+const txnModal = $("txnModal");
 
 function setModalType(type) {
   modalType = type;
-  typeButtons.forEach(b => b.classList.toggle("active", b.dataset.type === type));
-  document.getElementById("newCategoryPanel").style.display = "none";
-  populateCategorySelect();
+  document.querySelectorAll("#txnModal .type-btn").forEach(b => b.classList.toggle("active", b.dataset.type === type));
+  $("modalTitle").textContent = ($("txnId").value ? "Edit " : "New ") + type;
+  $("saveTxnBtn").textContent = "Save " + type;
+  $("newCategoryPanel").style.display = "none";
+  if (!findCategory(type, selectedCategory)) selectedCategory = allCategories(type)[0].name;
+  renderCatRow();
 }
 
-function populateCategorySelect(selected) {
-  const select = document.getElementById("category");
-  select.innerHTML = "";
+document.querySelectorAll("#txnModal .type-btn").forEach(b =>
+  b.addEventListener("click", () => setModalType(b.dataset.type)));
+
+function renderCatRow() {
+  const row = $("catRow");
+  row.innerHTML = "";
   allCategories(modalType).forEach(c => {
-    const opt = document.createElement("option");
-    opt.value = c.name;
-    opt.textContent = c.icon + " " + c.name;
-    select.appendChild(opt);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "cat-btn" + (c.name === selectedCategory ? " active" : "");
+    if (c.name === selectedCategory) {
+      btn.style.background = `var(--cat-${c.var}-bg)`;
+      btn.style.color = `var(--cat-${c.var}-text)`;
+    }
+    btn.innerHTML = `<span class="cat-emoji">${c.icon}</span><span>${escapeHtml(c.name)}</span>`;
+    btn.addEventListener("click", () => { selectedCategory = c.name; renderCatRow(); });
+    row.appendChild(btn);
   });
-  const addOpt = document.createElement("option");
-  addOpt.value = "__add__";
-  addOpt.textContent = "➕ Add new category";
-  select.appendChild(addOpt);
-  if (selected) select.value = selected;
+
+  const add = document.createElement("button");
+  add.type = "button";
+  add.className = "cat-btn";
+  add.innerHTML = `<span class="cat-emoji">＋</span><span>New</span>`;
+  add.addEventListener("click", () => {
+    $("newCategoryPanel").style.display = "block";
+    selectedPaletteIndex = 0;
+    renderPaletteSwatches();
+    $("newCatName").focus();
+  });
+  row.appendChild(add);
 }
 
 function renderPaletteSwatches() {
-  const container = document.getElementById("paletteSwatches");
+  const container = $("paletteSwatches");
   container.innerHTML = "";
   PALETTES.forEach((p, i) => {
     const btn = document.createElement("button");
@@ -251,108 +243,103 @@ function renderPaletteSwatches() {
     btn.className = "palette-swatch" + (i === selectedPaletteIndex ? " selected" : "");
     btn.style.background = p.lightBg;
     btn.title = p.name;
-    btn.addEventListener("click", () => {
-      selectedPaletteIndex = i;
-      renderPaletteSwatches();
-    });
+    btn.addEventListener("click", () => { selectedPaletteIndex = i; renderPaletteSwatches(); });
     container.appendChild(btn);
   });
 }
 
-let selectedPaletteIndex = 0;
-
-document.getElementById("category").addEventListener("change", e => {
-  if (e.target.value === "__add__") {
-    document.getElementById("newCategoryPanel").style.display = "block";
-    selectedPaletteIndex = 0;
-    renderPaletteSwatches();
-    document.getElementById("newCatName").focus();
-  }
+$("cancelNewCat").addEventListener("click", () => {
+  $("newCategoryPanel").style.display = "none";
+  $("newCatName").value = "";
+  $("newCatIcon").value = "";
 });
 
-document.getElementById("cancelNewCat").addEventListener("click", () => {
-  document.getElementById("newCategoryPanel").style.display = "none";
-  document.getElementById("newCatName").value = "";
-  document.getElementById("newCatIcon").value = "";
-  populateCategorySelect();
-});
-
-document.getElementById("confirmNewCat").addEventListener("click", () => {
-  const name = document.getElementById("newCatName").value.trim();
-  if (!name) {
-    alert("Please enter a category name.");
-    return;
-  }
+$("confirmNewCat").addEventListener("click", () => {
+  const name = $("newCatName").value.trim();
+  if (!name) { alert("Please enter a category name."); return; }
   if (allCategories(modalType).some(c => c.name.toLowerCase() === name.toLowerCase())) {
-    alert("That category already exists.");
-    return;
+    alert("That category already exists."); return;
   }
-  const icon = document.getElementById("newCatIcon").value.trim() || "🏷️";
+  const icon = $("newCatIcon").value.trim() || "🏷️";
   const varId = "custom" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   customCategories[modalType].push({ name, icon, var: varId, paletteIndex: selectedPaletteIndex });
   saveCustomCategories();
   rebuildCustomCategoryStyles();
-
-  document.getElementById("newCategoryPanel").style.display = "none";
-  document.getElementById("newCatName").value = "";
-  document.getElementById("newCatIcon").value = "";
-  populateCategorySelect(name);
+  $("newCategoryPanel").style.display = "none";
+  $("newCatName").value = "";
+  $("newCatIcon").value = "";
+  selectedCategory = name;
+  renderCatRow();
   populateCategoryFilter();
   renderBudgets();
 });
 
+/* amount keypad */
+function renderAmount() {
+  $("amountDisplay").textContent = amountStr === "" ? "0" : amountStr;
+  $("saveTxnBtn").disabled = !(parseFloat(amountStr) > 0);
+}
+
+$("keypad").addEventListener("click", e => {
+  const key = e.target.closest("button");
+  if (!key) return;
+  const k = key.dataset.key;
+  if (k === "del") amountStr = amountStr.slice(0, -1);
+  else if (k === ".") { if (!amountStr.includes(".")) amountStr = (amountStr || "0") + "."; }
+  else {
+    const decimals = amountStr.split(".")[1];
+    if (decimals && decimals.length >= 2) return;
+    if (amountStr === "0") amountStr = k; else amountStr += k;
+  }
+  renderAmount();
+});
+
 function openAddModal() {
-  modalTitle.textContent = "Add Transaction";
-  deleteTxnBtn.style.display = "none";
-  document.getElementById("txnId").value = "";
-  txnForm.reset();
-  document.getElementById("date").value = today();
-  setModalType("income");
+  $("txnId").value = "";
+  amountStr = "";
+  selectedCategory = null;
+  $("date").value = today();
+  $("paymentMethod").value = "Cash";
+  $("note").value = "";
+  $("deleteTxnBtn").style.display = "none";
+  setModalType("expense");
+  renderAmount();
   txnModal.classList.add("open");
 }
 
 function openEditModal(id) {
   const t = transactions.find(x => x.id === id);
   if (!t) return;
-  modalTitle.textContent = "Edit Transaction";
-  deleteTxnBtn.style.display = "inline-block";
-  document.getElementById("txnId").value = t.id;
-  document.getElementById("amount").value = t.amount;
-  document.getElementById("date").value = t.date;
-  document.getElementById("paymentMethod").value = t.paymentMethod;
-  document.getElementById("note").value = t.note || "";
-  modalType = t.type;
-  typeButtons.forEach(b => b.classList.toggle("active", b.dataset.type === t.type));
-  document.getElementById("newCategoryPanel").style.display = "none";
-  populateCategorySelect(t.category);
+  $("txnId").value = t.id;
+  amountStr = String(t.amount);
+  selectedCategory = t.category;
+  $("date").value = t.date;
+  $("paymentMethod").value = t.paymentMethod || "Cash";
+  $("note").value = t.note || "";
+  $("deleteTxnBtn").style.display = "inline-block";
+  setModalType(t.type);
+  renderAmount();
   txnModal.classList.add("open");
 }
 
 function closeTxnModal() { txnModal.classList.remove("open"); }
 
-document.getElementById("fabAdd").addEventListener("click", openAddModal);
-document.getElementById("closeModal").addEventListener("click", closeTxnModal);
+$("fabAdd").addEventListener("click", openAddModal);
+$("closeModal").addEventListener("click", closeTxnModal);
 txnModal.addEventListener("click", e => { if (e.target === txnModal) closeTxnModal(); });
 
-txnForm.addEventListener("submit", e => {
-  e.preventDefault();
-  const id = document.getElementById("txnId").value;
-  const amount = parseFloat(document.getElementById("amount").value);
+$("saveTxnBtn").addEventListener("click", () => {
+  const amount = parseFloat(amountStr);
   if (!amount || amount <= 0) return;
-  if (document.getElementById("category").value === "__add__") {
-    alert("Finish adding your new category first, or pick an existing one.");
-    return;
-  }
-
+  const id = $("txnId").value;
   const data = {
     type: modalType,
     amount,
-    category: document.getElementById("category").value,
-    date: document.getElementById("date").value,
-    paymentMethod: document.getElementById("paymentMethod").value,
-    note: document.getElementById("note").value.trim()
+    category: selectedCategory,
+    date: $("date").value || today(),
+    paymentMethod: $("paymentMethod").value,
+    note: $("note").value.trim()
   };
-
   if (id) {
     const idx = transactions.findIndex(t => t.id === id);
     if (idx !== -1) transactions[idx] = { ...transactions[idx], ...data };
@@ -360,55 +347,108 @@ txnForm.addEventListener("submit", e => {
     data.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     transactions.unshift(data);
   }
-
   saveTransactions();
   closeTxnModal();
   renderAll();
 });
 
-deleteTxnBtn.addEventListener("click", () => {
-  const id = document.getElementById("txnId").value;
-  if (!id) return;
-  if (!confirm("Delete this transaction?")) return;
+$("deleteTxnBtn").addEventListener("click", () => {
+  const id = $("txnId").value;
+  if (!id || !confirm("Delete this transaction?")) return;
   transactions = transactions.filter(t => t.id !== id);
   saveTransactions();
   closeTxnModal();
   renderAll();
 });
 
-/* ---------- COMPUTATIONS ---------- */
+/* ---------- TXN ROWS ---------- */
+function buildTxnRow(t) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "txn-item";
+  const meta = [t.note, t.paymentMethod].filter(Boolean).map(escapeHtml).join(" · ");
+  btn.innerHTML = `
+    <span class="txn-icon" style="background:${catBg(t.type, t.category)};">${catIcon(t.type, t.category)}</span>
+    <span class="txn-info">
+      <span class="txn-cat">${escapeHtml(t.category)}</span>
+      <span class="txn-meta">${meta || "&nbsp;"}</span>
+    </span>
+    <span class="txn-amount ${t.type}">${t.type === "income" ? "+" : "−"} ${fmtPlain(t.amount)}</span>
+  `;
+  btn.addEventListener("click", () => openEditModal(t.id));
+  return btn;
+}
+
+function renderGroups(container, list) {
+  container.innerHTML = "";
+  const groups = {};
+  list.forEach(t => { (groups[t.date] = groups[t.date] || []).push(t); });
+  Object.keys(groups).sort((a, b) => b.localeCompare(a)).forEach(date => {
+    const rows = groups[date];
+    const net = rows.reduce((s, t) => s + (t.type === "income" ? t.amount : -t.amount), 0);
+    const head = document.createElement("div");
+    head.className = "day-head";
+    head.innerHTML = `<span>${dayLabel(date)}</span><span class="day-total ${net >= 0 ? "income" : "expense"}">${net >= 0 ? "+" : "−"} ${fmtMoney(Math.abs(net)).replace("RM ", "RM ")}</span>`;
+    container.appendChild(head);
+    rows.forEach(t => container.appendChild(buildTxnRow(t)));
+  });
+}
+
+/* ---------- COMPUTE ---------- */
 function computeTotals() {
-  const balance = transactions.reduce((s, t) => s + (t.type === "income" ? t.amount : -t.amount), 0);
   const mKey = currentMonthKey();
   const monthTxns = transactions.filter(t => monthKey(t.date) === mKey);
   const monthIncome = monthTxns.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
   const monthExpense = monthTxns.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
-  return { balance, monthIncome, monthExpense, monthSavings: monthIncome - monthExpense };
+  const totalLimit = Object.values(budgets).reduce((s, v) => s + (Number(v) || 0), 0);
+  return { monthIncome, monthExpense, totalLimit };
 }
 
-/* ---------- RENDER: DASHBOARD ---------- */
+function monthName() {
+  return new Date().toLocaleDateString(undefined, { month: "long", year: "numeric" });
+}
+
+/* ---------- RENDER: HOME ---------- */
 function renderDashboard() {
-  const { balance, monthIncome, monthExpense, monthSavings } = computeTotals();
-  document.getElementById("statBalance").textContent = fmtMoney(balance);
-  document.getElementById("statIncome").textContent = "▲ " + fmtMoney(monthIncome);
-  document.getElementById("statExpense").textContent = "▼ " + fmtMoney(monthExpense);
-  document.getElementById("statSavings").textContent = fmtMoney(monthSavings);
+  const { monthIncome, monthExpense, totalLimit } = computeTotals();
+  $("heroMonth").textContent = monthName();
+  $("statIncome").textContent = fmtMoney(monthIncome);
+  $("statExpense").textContent = fmtMoney(monthExpense);
 
-  const recent = transactions.slice(0, 5);
-  const recentList = document.getElementById("recentList");
-  recentList.innerHTML = "";
-  document.getElementById("recentEmpty").style.display = recent.length === 0 ? "block" : "none";
-  recent.forEach(t => recentList.appendChild(buildTxnRow(t)));
+  const hasBudget = totalLimit > 0;
+  $("heroBarWrap").style.display = hasBudget ? "flex" : "none";
+  $("heroHint").style.display = hasBudget ? "none" : "block";
+
+  if (hasBudget) {
+    const left = totalLimit - monthExpense;
+    $("heroLabel").textContent = left >= 0 ? "Left to spend this month" : "Over budget this month";
+    const [whole, cents] = fmtMoney(Math.abs(left)).split(".");
+    $("heroValue").innerHTML = `${whole}<span class="cents">.${cents}</span>`;
+    $("heroValue").classList.toggle("over", left < 0);
+    const pct = Math.min((monthExpense / totalLimit) * 100, 100);
+    $("heroBarFill").style.width = pct + "%";
+    $("heroBarFill").classList.toggle("over", left < 0);
+    $("heroSpent").textContent = fmtMoney(monthExpense) + " spent";
+    $("heroLimit").textContent = "of " + fmtMoney(totalLimit) + " budget";
+  } else {
+    $("heroLabel").textContent = "Spent this month";
+    const [whole, cents] = fmtMoney(monthExpense).split(".");
+    $("heroValue").innerHTML = `${whole}<span class="cents">.${cents}</span>`;
+    $("heroValue").classList.remove("over");
+  }
+
+  const recent = [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
+  $("recentEmpty").style.display = recent.length ? "none" : "block";
+  renderGroups($("recentGroups"), recent);
 }
 
-/* ---------- RENDER: TRANSACTIONS ---------- */
+/* ---------- RENDER: ACTIVITY ---------- */
 function populateCategoryFilter() {
-  const select = document.getElementById("categoryFilter");
+  const select = $("categoryFilter");
   const currentVal = select.value;
   select.innerHTML = '<option value="all">All categories</option>';
-  const allCats = [...allCategories("income"), ...allCategories("expense")];
   const seen = new Set();
-  allCats.forEach(c => {
+  [...allCategories("income"), ...allCategories("expense")].forEach(c => {
     if (seen.has(c.name)) return;
     seen.add(c.name);
     const opt = document.createElement("option");
@@ -419,46 +459,25 @@ function populateCategoryFilter() {
   select.value = currentVal || "all";
 }
 
-function buildTxnRow(t) {
-  const li = document.createElement("li");
-  li.className = "txn-item";
-  li.style.background = catBg(t.type, t.category);
-  li.innerHTML = `
-    <div class="txn-icon" style="background:rgba(255,255,255,0.5);">${catIcon(t.type, t.category)}</div>
-    <div class="txn-info">
-      <span class="txn-cat">${escapeHtml(t.category)}${t.note ? " · " + escapeHtml(t.note) : ""}</span>
-      <span class="txn-meta">${fmtDate(t.date)} · ${escapeHtml(t.paymentMethod)}</span>
-    </div>
-    <span class="txn-amount ${t.type}">${t.type === "income" ? "+" : "-"}${fmtMoney(t.amount)}</span>
-  `;
-  li.addEventListener("click", () => openEditModal(t.id));
-  return li;
-}
-
 function renderTransactionList() {
-  const search = document.getElementById("searchInput").value.trim().toLowerCase();
+  const search = $("searchInput").value.trim().toLowerCase();
   const typeF = document.querySelector("#typeFilter .chip.active").dataset.type;
-  const catF = document.getElementById("categoryFilter").value;
+  const catF = $("categoryFilter").value;
 
   let list = [...transactions].sort((a, b) => b.date.localeCompare(a.date));
-
   if (typeF !== "all") list = list.filter(t => t.type === typeF);
   if (catF !== "all") list = list.filter(t => t.category === catF);
   if (search) {
     list = list.filter(t =>
-      t.category.toLowerCase().includes(search) ||
-      (t.note || "").toLowerCase().includes(search)
-    );
+      t.category.toLowerCase().includes(search) || (t.note || "").toLowerCase().includes(search));
   }
 
-  const container = document.getElementById("txnFullList");
-  container.innerHTML = "";
-  document.getElementById("txnEmpty").style.display = list.length === 0 ? "block" : "none";
-  list.forEach(t => container.appendChild(buildTxnRow(t)));
+  $("txnEmpty").style.display = list.length ? "none" : "block";
+  renderGroups($("txnGroups"), list);
 }
 
-document.getElementById("searchInput").addEventListener("input", renderTransactionList);
-document.getElementById("categoryFilter").addEventListener("change", renderTransactionList);
+$("searchInput").addEventListener("input", renderTransactionList);
+$("categoryFilter").addEventListener("change", renderTransactionList);
 document.querySelectorAll("#typeFilter .chip").forEach(chip => {
   chip.addEventListener("click", () => {
     document.querySelectorAll("#typeFilter .chip").forEach(c => c.classList.remove("active"));
@@ -470,55 +489,71 @@ document.querySelectorAll("#typeFilter .chip").forEach(chip => {
 /* ---------- RENDER: BUDGETS ---------- */
 function renderBudgets() {
   const mKey = currentMonthKey();
-  const container = document.getElementById("budgetList");
+  const { monthExpense, totalLimit } = computeTotals();
+
+  const now = new Date();
+  const daysLeft = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate();
+  $("budgetSubhead").textContent = `${monthName()} · ${daysLeft} day${daysLeft === 1 ? "" : "s"} left`;
+
+  if (totalLimit > 0) {
+    $("overallPct").textContent = Math.round((monthExpense / totalLimit) * 100) + "% used";
+    $("overallAmounts").innerHTML = `${fmtMoney(monthExpense)}<br>of ${fmtMoney(totalLimit)}`;
+  } else {
+    $("overallPct").textContent = "No limits yet";
+    $("overallAmounts").textContent = "Set one below";
+  }
+
+  const container = $("budgetList");
   container.innerHTML = "";
 
   allCategories("expense").forEach(c => {
     const spent = transactions
       .filter(t => t.type === "expense" && t.category === c.name && monthKey(t.date) === mKey)
       .reduce((s, t) => s + t.amount, 0);
-    const limit = budgets[c.name] || 0;
+    const limit = Number(budgets[c.name]) || 0;
     const pct = limit > 0 ? Math.min((spent / limit) * 100, 100) : 0;
     const isOver = limit > 0 && spent > limit;
     const isWarn = limit > 0 && !isOver && spent / limit >= 0.8;
+
+    let status = "No limit set · " + fmtMoney(spent) + " spent";
+    if (isOver) status = fmtMoney(spent - limit) + " over budget";
+    else if (isWarn) status = fmtMoney(limit - spent) + " left · running close";
+    else if (limit > 0) status = fmtMoney(limit - spent) + " left";
 
     const card = document.createElement("div");
     card.className = "budget-card";
     card.innerHTML = `
       <div class="budget-top">
-        <div class="budget-cat">
-          <span class="budget-cat-icon" style="background:${catBg("expense", c.name)};">${c.icon}</span>
-          ${c.name}
-        </div>
-        <input type="number" class="budget-limit-input" min="0" placeholder="No limit" value="${limit || ""}" data-cat="${c.name}">
+        <span class="budget-cat-icon" style="background:${catBg("expense", c.name)};">${c.icon}</span>
+        <span class="budget-name">${escapeHtml(c.name)}</span>
+        <input type="number" class="budget-limit-input" min="0" placeholder="No limit" value="${limit || ""}" data-cat="${escapeHtml(c.name)}">
       </div>
       <div class="budget-bar-track">
-        <div class="budget-bar-fill ${isOver ? "over" : isWarn ? "warn" : ""}" style="width:${limit > 0 ? pct : 0}%;"></div>
+        <div class="budget-bar-fill ${isOver ? "over" : isWarn ? "warn" : ""}" style="width:${pct}%;"></div>
       </div>
-      <div class="budget-sub ${isOver ? "over-text" : ""}">
-        <span>${fmtMoney(spent)} spent</span>
-        <span>${limit > 0 ? (isOver ? "Over budget!" : fmtMoney(limit - spent) + " left") : "No limit set"}</span>
-      </div>
+      <div class="budget-status ${isOver ? "over" : isWarn ? "warn" : ""}">${status}</div>
     `;
     container.appendChild(card);
   });
 
   container.querySelectorAll(".budget-limit-input").forEach(input => {
     input.addEventListener("change", () => {
-      const cat = input.dataset.cat;
       const val = parseFloat(input.value);
-      if (val > 0) budgets[cat] = val;
-      else delete budgets[cat];
+      if (val > 0) budgets[input.dataset.cat] = val;
+      else delete budgets[input.dataset.cat];
       saveBudgets();
       renderBudgets();
+      renderDashboard();
     });
   });
 }
 
 /* ---------- RENDER: CHARTS ---------- */
 function renderCharts() {
+  $("chartsMonth").textContent = monthName();
   renderDonut();
   renderBarChart();
+  renderTakeaway();
 }
 
 function renderDonut() {
@@ -529,42 +564,43 @@ function renderDonut() {
     .forEach(t => { totals[t.category] = (totals[t.category] || 0) + t.amount; });
 
   const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
-  const svg = document.getElementById("donutChart");
-  const legend = document.getElementById("donutLegend");
-  const emptyEl = document.getElementById("donutEmpty");
+  const svg = $("donutChart");
+  const legend = $("donutLegend");
+  const holder = svg.parentElement;
   svg.innerHTML = "";
   legend.innerHTML = "";
 
-  if (entries.length === 0) {
-    emptyEl.style.display = "block";
-    svg.style.display = "none";
+  if (!entries.length) {
+    $("donutEmpty").style.display = "block";
+    holder.style.display = "none";
     legend.style.display = "none";
     return;
   }
-  emptyEl.style.display = "none";
-  svg.style.display = "block";
+  $("donutEmpty").style.display = "none";
+  holder.style.display = "block";
   legend.style.display = "flex";
 
   const total = entries.reduce((s, [, v]) => s + v, 0);
-  const radius = 80;
-  const circumference = 2 * Math.PI * radius;
+  $("donutTotal").textContent = Math.round(total).toLocaleString();
+
+  const radius = 80, circumference = 2 * Math.PI * radius;
   let offset = 0;
 
   const bg = document.createElementNS("http://www.w3.org/2000/svg", "circle");
   bg.setAttribute("cx", "100"); bg.setAttribute("cy", "100"); bg.setAttribute("r", radius);
   bg.setAttribute("fill", "none");
-  bg.setAttribute("stroke", "var(--surface-soft)");
-  bg.setAttribute("stroke-width", "28");
+  bg.setAttribute("stroke", cssVal("var(--surface-soft)"));
+  bg.setAttribute("stroke-width", "30");
   svg.appendChild(bg);
 
   entries.forEach(([cat, amt]) => {
-    const frac = amt / total;
-    const dash = frac * circumference;
+    const colour = cssVal(catText("expense", cat));
+    const dash = (amt / total) * circumference;
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     circle.setAttribute("cx", "100"); circle.setAttribute("cy", "100"); circle.setAttribute("r", radius);
     circle.setAttribute("fill", "none");
-    circle.setAttribute("stroke", catText("expense", cat));
-    circle.setAttribute("stroke-width", "28");
+    circle.setAttribute("stroke", colour);
+    circle.setAttribute("stroke-width", "30");
     circle.setAttribute("stroke-dasharray", `${dash} ${circumference - dash}`);
     circle.setAttribute("stroke-dashoffset", -offset);
     circle.setAttribute("transform", "rotate(-90 100 100)");
@@ -574,84 +610,93 @@ function renderDonut() {
     const row = document.createElement("div");
     row.className = "legend-row";
     row.innerHTML = `
-      <span class="legend-dot" style="background:${catText("expense", cat)};"></span>
+      <span class="legend-dot" style="background:${colour};"></span>
       <span class="legend-label">${escapeHtml(cat)}</span>
-      <span class="legend-amt">${fmtMoney(amt)}</span>
+      <span class="legend-amt">${fmtPlain(amt)}</span>
     `;
     legend.appendChild(row);
   });
 }
 
 function renderBarChart() {
-  const svg = document.getElementById("barChart");
+  const svg = $("barChart");
   svg.innerHTML = "";
 
-  const months = [];
   const now = new Date();
+  const months = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     months.push(`${d.getFullYear()}-${pad2(d.getMonth() + 1)}`);
   }
 
-  const data = months.map(mKey => {
-    const income = transactions.filter(t => t.type === "income" && monthKey(t.date) === mKey).reduce((s, t) => s + t.amount, 0);
-    const expense = transactions.filter(t => t.type === "expense" && monthKey(t.date) === mKey).reduce((s, t) => s + t.amount, 0);
-    return { mKey, income, expense };
-  });
+  const data = months.map(mKey => ({
+    mKey,
+    income: transactions.filter(t => t.type === "income" && monthKey(t.date) === mKey).reduce((s, t) => s + t.amount, 0),
+    expense: transactions.filter(t => t.type === "expense" && monthKey(t.date) === mKey).reduce((s, t) => s + t.amount, 0)
+  }));
 
   const max = Math.max(1, ...data.map(d => Math.max(d.income, d.expense)));
-  const chartH = 150, chartTop = 10, chartBottom = chartTop + chartH;
-  const groupW = 320 / data.length;
-  const barW = 12;
+  const chartH = 150, chartTop = 8, chartBottom = chartTop + chartH;
+  const groupW = 320 / data.length, barW = 12;
+  const incomeCol = cssVal("var(--income-text)");
+  const expenseCol = cssVal("var(--expense-text)");
+  const mutedCol = cssVal("var(--muted)");
+  const textCol = cssVal("var(--text)");
 
   data.forEach((d, i) => {
     const cx = groupW * i + groupW / 2;
-    const incomeH = (d.income / max) * chartH;
-    const expenseH = (d.expense / max) * chartH;
-
-    const incomeRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    incomeRect.setAttribute("x", cx - barW - 2);
-    incomeRect.setAttribute("y", chartBottom - incomeH);
-    incomeRect.setAttribute("width", barW);
-    incomeRect.setAttribute("height", incomeH);
-    incomeRect.setAttribute("rx", 4);
-    incomeRect.setAttribute("fill", "var(--income-text)");
-    svg.appendChild(incomeRect);
-
-    const expenseRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    expenseRect.setAttribute("x", cx + 2);
-    expenseRect.setAttribute("y", chartBottom - expenseH);
-    expenseRect.setAttribute("width", barW);
-    expenseRect.setAttribute("height", expenseH);
-    expenseRect.setAttribute("rx", 4);
-    expenseRect.setAttribute("fill", "var(--expense-text)");
-    svg.appendChild(expenseRect);
+    [[d.income, cx - barW - 2, incomeCol], [d.expense, cx + 2, expenseCol]].forEach(([val, x, colour]) => {
+      const h = (val / max) * chartH;
+      if (h <= 0) return;
+      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      rect.setAttribute("x", x);
+      rect.setAttribute("y", chartBottom - h);
+      rect.setAttribute("width", barW);
+      rect.setAttribute("height", h);
+      rect.setAttribute("rx", 4);
+      rect.setAttribute("fill", colour);
+      svg.appendChild(rect);
+    });
 
     const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
     label.setAttribute("x", cx);
-    label.setAttribute("y", chartBottom + 16);
+    label.setAttribute("y", chartBottom + 20);
     label.setAttribute("text-anchor", "middle");
-    label.setAttribute("font-size", "9");
-    label.setAttribute("fill", "var(--muted)");
-    const d2 = new Date(d.mKey + "-01T00:00:00");
-    label.textContent = d2.toLocaleDateString(undefined, { month: "short" });
+    label.setAttribute("font-size", "10");
+    label.setAttribute("font-weight", "700");
+    label.setAttribute("font-family", "Nunito, sans-serif");
+    label.setAttribute("fill", i === data.length - 1 ? textCol : mutedCol);
+    label.textContent = new Date(d.mKey + "-01T00:00:00").toLocaleDateString(undefined, { month: "short" });
     svg.appendChild(label);
   });
 }
 
-/* ---------- RENDER ALL ---------- */
+function renderTakeaway() {
+  const { monthIncome, monthExpense } = computeTotals();
+  const el = $("takeaway");
+  if (!monthIncome && !monthExpense) {
+    el.style.display = "none";
+    return;
+  }
+  el.style.display = "block";
+  const saved = monthIncome - monthExpense;
+  el.textContent = saved >= 0
+    ? `You've saved ${fmtMoney(saved)} this month.`
+    : `You've spent ${fmtMoney(-saved)} more than you earned this month.`;
+}
+
+/* ---------- INIT ---------- */
 function renderAll() {
   renderDashboard();
   populateCategoryFilter();
   renderTransactionList();
   renderBudgets();
-  if (document.getElementById("panel-charts").classList.contains("active")) renderCharts();
+  if ($("panel-charts").classList.contains("active")) renderCharts();
 }
 
 initTheme();
 rebuildCustomCategoryStyles();
-populateCategorySelect();
-document.getElementById("date").value = today();
+$("date").value = today();
 renderAll();
 
 if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
