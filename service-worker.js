@@ -1,4 +1,4 @@
-const CACHE_NAME = "spendtrack-v1";
+const CACHE_NAME = "spendtrack-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
