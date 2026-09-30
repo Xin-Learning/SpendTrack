@@ -18,6 +18,7 @@ try {
 
 Write-Host "SpendTrack is running:"
 Write-Host "  On this PC:      http://localhost:$Port/"
+Write-Host "  Food store:      http://localhost:$Port/store/"
 if ($lanAvailable) {
     $localIP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notmatch "Loopback" -and $_.IPAddress -notlike "169.254*" } | Select-Object -First 1).IPAddress
     if ($localIP) {
@@ -35,6 +36,8 @@ $mimeMap = @{
   ".json" = "application/json"
   ".png"  = "image/png"
   ".jpg"  = "image/jpeg"
+  ".jpeg" = "image/jpeg"
+  ".webp" = "image/webp"
   ".svg"  = "image/svg+xml"
   ".ico"  = "image/x-icon"
 }
@@ -45,7 +48,7 @@ while ($listener.IsListening) {
   $response = $context.Response
 
   $path = $request.Url.LocalPath
-  if ($path -eq "/") { $path = "/index.html" }
+  if ($path.EndsWith("/")) { $path = $path + "index.html" }
   $filePath = Join-Path $Root ($path.TrimStart("/"))
 
   if (Test-Path $filePath -PathType Leaf) {

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Order online</title>
+<meta name="description" content="Order online for pickup or delivery.">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0A0A0A">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="style.css">
+<script src="config.js"></script>
+<script>document.documentElement.dataset.theme = (window.STORE && STORE.theme) || "dark";</script>
+</head>
+<body>
+  <div class="page">
+    <header class="top">
+      <h1><span id="brandLogo" class="brand-logo"></span> <span id="brandTitle"></span></h1>
+      <p class="top-meta">
+        <span id="storeName" class="store-name"></span>
+        <span id="storeStatus" class="status"></span>
+      </p>
+    </header>
+
+    <p id="notice" class="notice" hidden></p>
+
+    <div id="reorder" class="reorder" hidden>
+      <div class="reorder-text">
+        <strong id="reorderTitle">Welcome back!</strong>
+        <span id="reorderItems"></span>
+      </div>
+      <button type="button" id="reorderBtn" class="btn btn-soft">Order again</button>
+    </div>
+
+    <form id="orderForm" novalidate>
+      <section class="step" id="stepDetails">
+        <h2>Your details</h2>
+        <div class="field" data-field="name">
+          <input id="custName" class="input" type="text" placeholder="Your name" autocomplete="name" maxlength="60">
+          <p class="field-error"></p>
+        </div>
+
+        <div class="field" data-field="phone">
+          <label class="label" for="custPhone"><strong>Your WhatsApp number</strong> (you'll get your order confirmation and payment details here)</label>
+          <div class="phone-row">
+            <div class="select-wrap"><select id="custCc" class="input" aria-label="Country code"></select></div>
+            <input id="custPhone" class="input" type="tel" inputmode="tel" placeholder="12-3456789" autocomplete="tel-national" maxlength="20">
+          </div>
+          <p class="field-error"></p>
+        </div>
+
+        <div class="field" data-field="recipient">
+          <label class="label" for="recPhone"><strong>Recipient's WhatsApp number</strong> (optional, leave blank if same person)</label>
+          <div class="phone-row">
+            <div class="select-wrap"><select id="recCc" class="input" aria-label="Recipient country code"></select></div>
+            <input id="recPhone" class="input" type="tel" inputmode="tel" placeholder="12-3456789" maxlength="20">
+          </div>
+          <p class="field-error"></p>
+        </div>
+      </section>
+
+      <section class="step" id="stepMenu">
+        <h2>Choose your food</h2>
+        <nav id="catNav" class="cat-nav" aria-label="Menu categories"></nav>
+        <div id="menu"></div>
+        <p class="step-error" data-error="menu"></p>
+      </section>
+
+      <section class="step" id="stepFulfil">
+        <h2 id="fulfilTitle">Pickup or delivery</h2>
+        <div id="modeSeg" class="seg" role="radiogroup" aria-label="Pickup or delivery">
+          <button type="button" role="radio" data-mode="pickup">Pickup</button>
+          <button type="button" role="radio" data-mode="delivery">Delivery</button>
+        </div>
+        <p id="modeInfo" class="hint"></p>
+        <div class="field" data-field="address" id="addressField">
+          <label class="label" for="custAddress"><strong>Delivery address</strong></label>
+          <textarea id="custAddress" class="input" rows="3" placeholder="Unit, building, street, postcode" autocomplete="street-address" maxlength="300"></textarea>
+          <p class="field-error"></p>
+        </div>
+      </section>
+
+      <section class="step" id="stepWhen">
+        <h2 id="whenTitle">When?</h2>
+        <div id="dateRow" class="date-row" role="radiogroup" aria-label="Date"></div>
+        <div id="slotGrid" class="slot-grid" role="radiogroup" aria-label="Time"></div>
+        <p class="step-error" data-error="slot"></p>
+      </section>
+
+      <section class="step" id="stepPay">
+        <h2 id="payTitle">Payment &amp; notes</h2>
+        <div id="payList" class="pay-list" role="radiogroup" aria-label="Payment method"></div>
+        <p class="step-error" data-error="payment"></p>
+        <label class="label" for="orderNotes"><strong>Notes for us</strong> (optional)</label>
+        <textarea id="orderNotes" class="input" rows="2" placeholder="Allergies, gift message, anything else" maxlength="300"></textarea>
+      </section>
+
+      <section class="step" id="stepReview">
+        <h2>Review &amp; send</h2>
+        <div id="review" class="review"></div>
+        <p class="step-error" data-error="form"></p>
+        <button type="submit" id="submitBtn" class="btn btn-primary btn-block">
+          <span class="wa-icon" aria-hidden="true"></span>
+          <span>Send order on WhatsApp</span>
+        </button>
+        <p class="fine">WhatsApp opens with your order filled in. Just tap send, and we'll confirm it there.</p>
+      </section>
+    </form>
+
+    <footer class="foot">
+      <div>
+        <h3>Find us</h3>
+        <a id="footAddress" target="_blank" rel="noopener"></a>
+      </div>
+      <div>
+        <h3>Opening hours</h3>
+        <dl id="footHours" class="hours"></dl>
+      </div>
+    </footer>
+  </div>
+
+  <div class="dock">
+    <div id="installBanner" class="install" hidden>
+      <div class="install-text">
+        <strong id="installTitle">Add to your home screen</strong>
+        <span id="installSub">One tap to order again, without hunting back through WhatsApp.</span>
+      </div>
+      <button type="button" id="installBtn" class="btn btn-primary">Install</button>
+      <button type="button" id="installClose" class="x-btn" aria-label="Dismiss">✕</button>
+    </div>
+    <button type="button" id="cartBar" class="cart-bar" hidden>
+      <span id="cartCount" class="cart-count">0</span>
+      <span class="cart-label">Review order</span>
+      <span id="cartTotal" class="cart-total">RM 0.00</span>
+    </button>
+  </div>
+
+  <!-- ITEM SHEET -->
+  <div id="itemSheet" class="overlay" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheet">
+      <button type="button" class="x-btn sheet-x" data-close aria-label="Close">✕</button>
+      <div class="sheet-scroll">
+        <div id="sheetHero" class="sheet-hero"></div>
+        <div class="sheet-pad">
+          <h3 id="sheetTitle"></h3>
+          <p id="sheetDesc" class="sheet-desc"></p>
+          <p id="sheetPrice" class="sheet-price"></p>
+          <div id="sheetOptions"></div>
+          <label class="label" for="sheetNote"><strong>Special request</strong> (optional)</label>
+          <textarea id="sheetNote" class="input" rows="2" maxlength="120" placeholder="e.g. no onions, sauce on the side"></textarea>
+        </div>
+      </div>
+      <div class="sheet-foot">
+        <div class="stepper stepper-lg">
+          <button type="button" id="sheetMinus" aria-label="Fewer">−</button>
+          <span id="sheetQty" aria-live="polite">1</span>
+          <button type="button" id="sheetPlus" aria-label="More">+</button>
+        </div>
+        <button type="button" id="sheetAdd" class="btn btn-primary btn-grow">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ORDER SENT -->
+  <div id="doneSheet" class="overlay" role="dialog" aria-modal="true" aria-labelledby="doneTitle">
+    <div class="sheet">
+      <div class="sheet-scroll">
+        <div class="sheet-pad done">
+          <div class="done-icon" aria-hidden="true">✓</div>
+          <h3 id="doneTitle">Almost done!</h3>
+          <p id="doneText"></p>
+          <a id="doneWa" class="btn btn-primary btn-block" target="_blank" rel="noopener">
+            <span class="wa-icon" aria-hidden="true"></span><span>Open WhatsApp</span>
+          </a>
+          <div id="donePreview" hidden>
+            <p class="warn-box">No store WhatsApp number is set yet (see <code>config.js</code>). This is the message that would be sent:</p>
+            <pre id="doneMessage" class="msg-preview"></pre>
+          </div>
+        </div>
+      </div>
+      <div class="sheet-foot">
+        <button type="button" class="btn btn-soft btn-block" data-close>Start a new order</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
