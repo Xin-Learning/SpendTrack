@@ -15,7 +15,8 @@
     cart: "foodstore.cart",
     customer: "foodstore.customer",
     lastOrder: "foodstore.lastOrder",
-    installHidden: "foodstore.installHidden"
+    installHidden: "foodstore.installHidden",
+    unsent: "foodstore.unsentOrders"
   };
 
   /* ---------- STORAGE ---------- */
@@ -833,6 +834,8 @@
     const order = {
       id: orderId(),
       mode,
+      date: slot.date,
+      time: slot.time,
       when: slotText(slot),
       lines: cart.map(l => {
         const item = itemsById.get(l.itemId);
@@ -852,6 +855,7 @@
     const waNumber = String(S.whatsapp || "").replace(/\D/g, "");
     const url = waNumber ? `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}` : "";
 
+    logToSheet(order);
     if (url) window.open(url, "_blank", "noopener");
 
     saveCustomer();
@@ -866,6 +870,46 @@
 
     showDone(order, message, url);
   });
+
+  /* ---------- GOOGLE SHEET ---------- */
+  // Orders wait in this phone's storage until the sheet has received them,
+  // so a patchy connection doesn't lose a sale. The sheet ignores repeats.
+  function logToSheet(order) {
+    if (!S.ordersSheetUrl) return;
+    const rm = c => c / 100;
+    const unsent = load(K.unsent, []);
+    unsent.push({
+      id: order.id,
+      date: order.date,
+      time: `${pad2(Math.floor(order.time / 60))}:${pad2(order.time % 60)}`,
+      mode: order.mode === "delivery" ? "Delivery" : "Pickup",
+      name: order.name,
+      phone: `+${order.phone}`,
+      recipient: order.recipient ? `+${order.recipient}` : "",
+      address: order.address,
+      payment: order.payment,
+      notes: order.notes,
+      lines: order.lines.map(l => ({ name: l.name, options: l.options.join("; "), note: l.note || "", qty: l.qty, total: rm(l.total) })),
+      subtotal: rm(order.subtotal),
+      fee: rm(order.fee),
+      total: rm(order.total)
+    });
+    save(K.unsent, unsent.slice(-30));
+    sendUnsent();
+  }
+
+  function sendUnsent() {
+    if (!S.ordersSheetUrl) return;
+    load(K.unsent, []).forEach(o => {
+      // The reply isn't needed, so "no-cors" avoids cross-site checks on Google's redirect.
+      // Only a network failure keeps the order queued for next time.
+      fetch(S.ordersSheetUrl, { method: "POST", mode: "no-cors", keepalive: true, body: JSON.stringify(o) })
+        .then(() => save(K.unsent, load(K.unsent, []).filter(u => u.id !== o.id)))
+        .catch(() => {});
+    });
+  }
+
+  window.addEventListener("online", sendUnsent);
 
   function showDone(order, message, url) {
     $("doneText").innerHTML = url
@@ -943,6 +987,7 @@
   renderReview();
   renderBar();
   renderReorder();
+  sendUnsent();
 
   // Keep times and "open now" fresh if the page is left open.
   setInterval(() => {

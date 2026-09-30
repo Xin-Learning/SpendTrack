@@ -15,6 +15,10 @@ window.STORE = {
   // e.g. "60123456789" for 012-345 6789. Leave empty to test without sending.
   whatsapp: "",
 
+  // Every order is also saved to your Google Sheet, which adds up your daily sales.
+  // Paste your Apps Script web app link here (see README, "Save orders to Google Sheets").
+  ordersSheetUrl: "",
+
   address: "Lot 1, Jalan Contoh, 88000 Kota Kinabalu, Sabah",
   mapsUrl: "https://maps.google.com/?q=Kota+Kinabalu",
   notice: "",                   // optional banner, e.g. "Closed 1–3 Oct for Raya 🎉"
